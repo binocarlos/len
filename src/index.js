@@ -44,7 +44,7 @@ Len.prototype.loadBooking = function(path, id, callback){
 		if(err){
 			return callback(err);
 		}
-		callback(null, JSON.parse(val || '{}'));
+		callback(null, val ? JSON.parse(val) : null);
 	})
 }
 

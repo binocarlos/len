@@ -141,19 +141,47 @@ describe('len', function(){
       
     })
 
-  })
 
-  describe('events', function(){
-    
+    it('should remove a booking', function(done){
+      var lendb = len(leveldb);
 
-    it('should emit events as data is written', function(done){
+      var start = new Date('01/03/2014 09:00:00');
+      var end = new Date('01/03/2014 13:00:00');
 
+      async.series([
+        function(next){
 
-      done();
+          lendb.saveBooking('mechanics.bob', 10, start.getTime(), end.getTime(), {
+            name:'Fix car'
+          }, function(err){
+            next(err);
+          })
+          
+        },
+
+        function(next){
+
+          lendb.removeBooking('mechanics.bob', 10, next);
+
+        },
+
+        function(next){
+
+          lendb.loadBooking('mechanics.bob', 10, function(err, booking){
+
+            (booking===undefined).should.equal(true);
+
+            next();
+
+          })
+          
+        }
+      ], done)
       
     })
 
   })
+
 
 	
 })

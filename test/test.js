@@ -65,7 +65,10 @@ describe('len', function(){
         instruction.type.should.equal(type);
 
         if(instruction.value){
-          instruction.value.should.equal('project.a.b.10');  
+
+          var hit = instruction.value.match(/^project\.a\.b\.10:/);
+
+          (hit ? true : false).should.equal(true);
         }
         
       })
@@ -180,6 +183,48 @@ describe('len', function(){
       
     })
 
+  })
+
+
+  describe('range query', function(){
+
+    it('should match only bookings in a time period for one resource', function(done){
+      var lendb = len(leveldb);
+
+      var start = new Date('01/03/2014 09:00:00');
+      var end = new Date('01/03/2014 13:00:00');
+
+      async.series([
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 10, start.getTime(), end.getTime(), {
+            name:'Fix car'
+          }, function(err){
+            next(err);
+          })
+          
+        },
+
+        function(next){
+
+          lendb.removeBooking('mechanics.bob', 10, next);
+
+        },
+
+        function(next){
+
+          lendb.loadBooking('mechanics.bob', 10, function(err, booking){
+
+            (booking===undefined).should.equal(true);
+
+            next();
+
+          })
+          
+        }
+      ], done)
+
+    })
   })
 
 

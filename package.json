@@ -1,0 +1,40 @@
+{
+  "name": "len",
+  "version": "0.0.1",
+  "description": "Calendar database for of resource bookings in leveldb",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "make test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/binocarlos/len.git"
+  },
+  "keywords": [
+    "calendar",
+    "database",
+    "time",
+    "resource",
+    "schedule",
+    "booking",
+    "leveldb"
+  ],
+  "devDependencies": {
+    "mocha": "~1.14.0",
+    "should": "~2.1.0",
+    "wrench": "~1.5.8",
+    "through": "~2.3.4",
+    "async": "~0.2.10",
+    "concat-stream": "~1.4.4"
+  },
+  "author": "Kai Davenport",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/binocarlos/lem/issues"
+  },
+  "homepage": "https://github.com/binocarlos/lem",
+  "dependencies": {
+    "level": "~0.18.0",
+    "level-live-stream": "~1.4.9"
+  }
+}

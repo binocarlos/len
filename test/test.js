@@ -72,12 +72,12 @@ describe('len', function(){
         }
         
       })
-      batch[0].key.should.equal('schedule~project~a~b~20~10');
-      batch[1].key.should.equal('schedule~project~a~b~30~10');
-      batch[2].key.should.equal('schedule~project~a~20~10');
-      batch[3].key.should.equal('schedule~project~a~30~10');
-      batch[4].key.should.equal('schedule~project~20~10');
-      batch[5].key.should.equal('schedule~project~30~10');
+      batch[0].key.should.equal('schedule~project~a~b~_booking~20~10');
+      batch[1].key.should.equal('schedule~project~a~b~_booking~30~10');
+      batch[2].key.should.equal('schedule~project~a~_booking~20~10');
+      batch[3].key.should.equal('schedule~project~a~_booking~30~10');
+      batch[4].key.should.equal('schedule~project~_booking~20~10');
+      batch[5].key.should.equal('schedule~project~_booking~30~10');
     }
 
     it('should make an add batch', function(done){
@@ -183,12 +183,8 @@ describe('len', function(){
       
     })
 
-  })
 
-
-  describe('range query', function(){
-
-    it('should match only bookings in a time period for one resource', function(done){
+    it('should update a booking', function(done){
       var lendb = len(leveldb);
 
       var start = new Date('01/03/2014 09:00:00');
@@ -207,7 +203,12 @@ describe('len', function(){
 
         function(next){
 
-          lendb.removeBooking('mechanics.bob', 10, next);
+          
+          lendb.saveBooking('mechanics.bob', 10, start.getTime()+10, end.getTime(), {
+            name:'Fix car2'
+          }, function(err){
+            next(err);
+          })
 
         },
 
@@ -215,7 +216,8 @@ describe('len', function(){
 
           lendb.loadBooking('mechanics.bob', 10, function(err, booking){
 
-            (booking===undefined).should.equal(true);
+            booking.meta.name.should.equal('Fix car2');
+            booking.start.should.equal(start.getTime()+10);
 
             next();
 
@@ -223,9 +225,470 @@ describe('len', function(){
           
         }
       ], done)
+      
+    })
+
+  })
+
+
+  describe('booking stream', function(){
+
+    it('should fetch bookings in the correct time window', function(done){
+      var lendb = len(leveldb);
+
+      var dates = {
+        day1_morning:{
+          start:new Date('03/01/2014 09:00:00'),
+          end:new Date('03/01/2014 13:00:00')
+        },
+        day1_afternoon:{
+          start:new Date('03/01/2014 13:30:00'),
+          end:new Date('03/01/2014 18:00:00')
+        },
+        day2:{
+          start:new Date('03/12/2014 09:30:00'),
+          end:new Date('03/12/2014 18:00:00')
+        }
+      }
+
+
+      async.series([
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 10, dates.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
+            name:'day 1 morning'
+          }, next)
+          
+        },
+
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 11, dates.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
+            name:'day 1 afternoon'
+          }, next)
+        },
+
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 12, dates.day2.start.getTime(), dates.day2.end.getTime(), {
+            name:'day 2'
+          }, next)
+        },
+
+        function(next){
+
+          var bookings = {};
+          var bookingarr = [];
+          lendb.createBookingStream('mechanics.bob').pipe(through(function(booking){
+            bookings[booking.id] = booking;
+            bookingarr.push(booking);
+          }, function(){
+
+            bookings['10'].meta.name.should.equal('day 1 morning');
+            bookingarr[0].id.should.equal(10);
+
+            bookings['11'].meta.name.should.equal('day 1 afternoon');
+            bookingarr[1].id.should.equal(11);
+
+            bookings['12'].meta.name.should.equal('day 2');
+            bookingarr[2].id.should.equal(12);
+
+            bookingarr.length.should.equal(3);
+
+            next();
+          }))
+          
+        },
+
+        function(next){
+
+          var bookings = {};
+          var bookingarr = [];
+
+          lendb.createBookingStream('mechanics.bob', {
+            start:new Date('03/01/2014 08:00:00'),
+            end:new Date('03/06/2014 08:00:00')
+          }).pipe(through(function(booking){
+            bookings[booking.id] = booking;
+
+          }, function(){
+            
+            bookings['10'].meta.name.should.equal('day 1 morning');
+            bookingarr[0].id.should.equal(10);
+
+            bookings['11'].meta.name.should.equal('day 1 afternoon');
+            bookingarr[1].id.should.equal(11);
+
+            bookingarr.length.should.equal(2);
+
+
+            next();
+          }))
+        },
+
+
+        function(next){
+
+          var bookings = {};
+          var bookingarr = [];
+
+
+
+          lendb.createBookingStream('mechanics.bob', {
+            start:new Date('03/01/2014 08:00:00'),
+            end:new Date('03/14/2014 08:00:00')
+          }).pipe(through(function(booking){
+            bookings[booking.id] = booking;
+
+          }, function(){
+            
+           
+            bookings['10'].meta.name.should.equal('day 1 morning');
+            bookingarr[0].id.should.equal(10);
+
+            bookings['11'].meta.name.should.equal('day 1 afternoon');
+            bookingarr[1].id.should.equal(11);
+
+            bookings['12'].meta.name.should.equal('day 2');
+            bookingarr[2].id.should.equal(12);
+
+            bookingarr.length.should.equal(3);
+
+            next();
+          }))
+
+          
+
+
+        },
+
+        function(next){
+          lendb.createBookingStream('mechanics.bob', {
+            start:new Date('03/01/2014 08:00:00'),
+            end:new Date('03/12/2014 10:00:00'),
+            inclusive:true
+          }).pipe(through(function(booking){
+            bookings[booking.id] = booking;
+
+          }, function(){
+
+
+            bookings['10'].meta.name.should.equal('day 1 morning');
+            bookingarr[0].id.should.equal(10);
+
+            bookings['11'].meta.name.should.equal('day 1 afternoon');
+            bookingarr[1].id.should.equal(11);
+
+            bookingarr.length.should.equal(2);
+
+
+            next();
+          }))
+        }
+      ], done)
+
+    })
+
+
+    it('should fetch bookings below a path', function(done){
+      
+      var dates = {
+        bob:{
+          day1_morning:{
+            start:new Date('03/01/2014 09:00:00'),
+            end:new Date('03/01/2014 13:00:00')
+          },
+          day1_afternoon:{
+            start:new Date('03/01/2014 13:30:00'),
+            end:new Date('03/01/2014 18:00:00')
+          },
+          day2:{
+            start:new Date('03/12/2014 09:30:00'),
+            end:new Date('03/12/2014 18:00:00')
+          }
+        },
+        dave:{
+          day1_morning:{
+            start:new Date('03/03/2014 09:00:00'),
+            end:new Date('03/03/2014 13:00:00')
+          },
+          day1_afternoon:{
+            start:new Date('03/03/2014 13:30:00'),
+            end:new Date('03/03/2014 18:00:00')
+          },
+          day2:{
+            start:new Date('03/16/2014 09:30:00'),
+            end:new Date('03/16/2014 18:00:00')
+          }
+        }
+      }
+
+      async.series([
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 10, dates.bob.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
+            name:'day 1 morning'
+          }, function(){
+            lendb.saveBooking('mechanics.dave', 10, dates.dave.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
+              name:'day 1 morning'
+            }, next)
+          })
+          
+        },
+
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 11, dates.bob.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
+            name:'day 1 afternoon'
+          }, function(){
+            lendb.saveBooking('mechanics.dave', 11, dates.dave.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
+              name:'day 1 afternoon'
+            }, next);
+          })
+        },
+
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 12, dates.bob.day2.start.getTime(), dates.day2.end.getTime(), {
+            name:'day 2'
+          }, function(){
+            lendb.saveBooking('mechanics.dave', 12, dates.dave.day2.start.getTime(), dates.day2.end.getTime(), {
+              name:'day 2'
+            }, next)
+          })
+        },
+
+        function(next){
+
+          var bookings = {};
+          var bookingarr = [];
+          lendb.createBookingStream('mechanics').pipe(through(function(booking){
+            bookings[booking.id] = booking;
+            bookingarr.push(booking);
+          }, function(){
+
+
+            bookingarr.length.should.equal(6);
+
+            next();
+          }))
+          
+        },
+
+      ], done)
 
     })
   })
+
+
+  describe('range query', function(){
+
+    it('should match only bookings in a time period for one resource', function(done){
+      var lendb = len(leveldb);
+
+      var dates = {
+        day1_morning:{
+          start:new Date('03/01/2014 09:00:00'),
+          end:new Date('03/01/2014 13:00:00')
+        },
+        day1_afternoon:{
+          start:new Date('03/01/2014 13:30:00'),
+          end:new Date('03/01/2014 18:00:00')
+        },
+        day2:{
+          start:new Date('03/12/2014 09:30:00'),
+          end:new Date('03/12/2014 18:00:00')
+        }
+      }
+
+
+      async.series([
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 10, dates.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
+            name:'day 1 morning'
+          }, next)
+          
+        },
+
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 11, dates.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
+            name:'day 1 afternoon'
+          }, next)
+        },
+
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 12, dates.day2.start.getTime(), dates.day2.end.getTime(), {
+            name:'day 2'
+          }, next)
+        },
+
+        function(next){
+          lendb.getRange('mechanics.bob', function(err, range){
+            range.start.should.equal(dates.day1_morning.start.getTime())
+            range.end.should.equal(dates.day2.end.getTime())
+            next();
+          })
+        },
+
+        function(next){
+          lendb.getRange('mechanics.bob', {
+            start:new Date('03/01/2014 08:00:00').getTime(),
+            end:new Date('03/06/2014 08:00:00').getTime()
+          }, function(err, range){
+            range.start.should.equal(dates.day1_morning.start.getTime())
+            range.end.should.equal(dates.day1_afternoon.end.getTime())
+            next();
+          })
+        },
+
+
+        function(next){
+          lendb.getRange('mechanics.bob', {
+            start:new Date('03/01/2014 08:00:00').getTime(),
+            end:new Date('03/12/2014 10:00:00').getTime()
+          }, function(err, range){
+            range.start.should.equal(dates.day1_morning.start.getTime())
+            range.end.should.equal(dates.day2.end.getTime())
+            next();
+          })
+        },
+
+        function(next){
+          lendb.getRange('mechanics.bob', {
+            start:new Date('03/01/2014 08:00:00').getTime(),
+            end:new Date('03/12/2014 10:00:00').getTime(),
+            inclusive:true
+          }, function(err, range){
+            range.start.should.equal(dates.day1_morning.start.getTime())
+            range.end.should.equal(dates.day1_afternoon.end.getTime())
+            next();
+          })
+        }
+      ], done)
+
+    })
+
+
+    it('should match bookings for resources below a path', function(done){
+      var lendb = len(leveldb);
+
+      var dates = {
+        bob:{
+          day1_morning:{
+            start:new Date('03/01/2014 09:00:00'),
+            end:new Date('03/01/2014 13:00:00')
+          },
+          day1_afternoon:{
+            start:new Date('03/01/2014 13:30:00'),
+            end:new Date('03/01/2014 18:00:00')
+          },
+          day2:{
+            start:new Date('03/12/2014 09:30:00'),
+            end:new Date('03/12/2014 18:00:00')
+          }
+        },
+        dave:{
+          day1_morning:{
+            start:new Date('03/03/2014 09:00:00'),
+            end:new Date('03/03/2014 13:00:00')
+          },
+          day1_afternoon:{
+            start:new Date('03/03/2014 13:30:00'),
+            end:new Date('03/03/2014 18:00:00')
+          },
+          day2:{
+            start:new Date('03/16/2014 09:30:00'),
+            end:new Date('03/16/2014 18:00:00')
+          }
+        }
+      }
+
+      async.series([
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 10, dates.bob.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
+            name:'day 1 morning'
+          }, function(){
+            lendb.saveBooking('mechanics.dave', 10, dates.dave.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
+              name:'day 1 morning'
+            }, next)
+          })
+          
+        },
+
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 11, dates.bob.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
+            name:'day 1 afternoon'
+          }, function(){
+            lendb.saveBooking('mechanics.dave', 11, dates.dave.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
+              name:'day 1 afternoon'
+            }, next);
+          })
+        },
+
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 12, dates.bob.day2.start.getTime(), dates.day2.end.getTime(), {
+            name:'day 2'
+          }, function(){
+            lendb.saveBooking('mechanics.dave', 12, dates.dave.day2.start.getTime(), dates.day2.end.getTime(), {
+              name:'day 2'
+            }, next)
+          })
+        },
+
+        function(next){
+          lendb.getRange('mechanics', function(err, range){
+            range.start.should.equal(dates.bob.day1_morning.start.getTime())
+            range.end.should.equal(dates.dave.day2.end.getTime())
+            next();
+          })
+        },
+
+        function(next){
+          lendb.getRange('mechanics', {
+            start:new Date('03/01/2014 08:00:00').getTime(),
+            end:new Date('03/06/2014 08:00:00').getTime()
+          }, function(err, range){
+            range.start.should.equal(dates.bob.day1_morning.start.getTime())
+            range.end.should.equal(dates.dave.day1_afternoon.end.getTime())
+            next();
+          })
+        },
+
+        function(next){
+          lendb.getRange('mechanics', {
+            start:new Date('03/01/2014 08:00:00').getTime(),
+            end:new Date('03/14/2014 10:00:00').getTime()
+          }, function(err, range){
+            range.start.should.equal(dates.bob.day1_morning.start.getTime())
+            range.end.should.equal(dates.dave.day2.end.getTime())
+            next();
+          })
+        },
+
+        function(next){
+          lendb.getRange('mechanics', {
+            start:new Date('03/01/2014 08:00:00').getTime(),
+            end:new Date('03/12/2014 10:00:00').getTime(),
+            inclusive:true
+          }, function(err, range){
+            range.start.should.equal(dates.bob.day1_morning.start.getTime())
+            range.end.should.equal(dates.dave.day1_afternoon.end.getTime())
+            next();
+          })
+        }
+      ], done)
+
+    })
+
+  })
+
+
 
 
 	

@@ -23,20 +23,30 @@ function bookingkey(path, id){
 }
 
 function schedulekey(path, id, time){
-	return 'schedule.' + path + '.' + time + '.' + id;
+	return 'schedule.' + path + '._booking.' + time + '.' + id;
 }
 
 function querykeys(path, starttime, endtime){
-	path = parsedots(path + '.');
-	var start = path;
-	var end = path;
-	if(starttime){
-		start += starttime;
+
+	var schedule_key = 'schedule.' + path + '.booking';
+
+	var start = schedule_key;
+	var end = schedule_key;
+	var inclusive = false;
+
+	if(window){
+		start += '.' + window.start;
+		end += '.' + window.end;
+		inclusive = window.inclusive;
 	}
-	if(endtime){
-		end += endtime;
+	else{
+		end += '\xff';
 	}
-	return levelrange(start, end);
+
+	return {
+		start:parsedots(start),
+		end:parsedots(end)
+	}
 }
 
 module.exports = {

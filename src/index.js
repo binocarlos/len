@@ -95,3 +95,43 @@ Len.prototype.removeBooking = function(path, id, callback){
 	})
 	
 }
+
+Len.prototype.createBookingStream = function(path, window, callback){
+	var self = this;
+
+	if(arguments.length<2){
+		callback = window;
+		window = null;
+	}
+
+
+	console.log('-------------------------------------------');
+	console.dir(start);
+	console.dir(end);
+
+	var counters = {};
+
+	return this._db.createReadStream({
+		start:start,
+		end:end,
+		keyEncoding:'ascii',
+		valueEncoding:'ascii',
+		keys:true,
+		values:true
+	}).pipe(through(function(key, data){
+
+		var parts = data.split(':');
+		var id = parts[0];
+		var type = parts[1];
+
+		if(inclusive){
+
+		}
+		
+
+		console.log('-------------------------------------------');
+		console.dir(key);
+		console.dir(data);
+
+	}))
+}

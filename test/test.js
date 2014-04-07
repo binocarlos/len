@@ -6,6 +6,8 @@ var http = require('http');
 var async = require('async');
 var wrench = require('wrench');
 
+var tools = require('../src/tools');
+
 describe('len', function(){
 
   var leveldb;
@@ -25,19 +27,41 @@ describe('len', function(){
     leveldb.close(done);
   })
 
+  describe('tools', function(){
+    it('should get day timestamps', function(){
+
+      var d = new Date('06/01/2014 11:00:00');
+
+      var floor = new Date('06/01/2014 00:00:00');
+      var ceil = new Date('06/02/2014 00:00:00');
+
+      var testfloor = tools.day_timestamp(d.getTime());
+      var testceil = tools.day_timestamp(d.getTime(), true);
+
+      testfloor.should.equal(floor.getTime());
+      testceil.should.equal(ceil.getTime());
+    })
+
+    it('should get querykeys', function(){
+
+      var start = new Date('06/01/2014 09:00:00');
+      var end = new Date('07/01/2014 11:00:00');
+
+      var keys = tools.querykeys('mything.apple', {
+        start:start.getTime(),
+        end:end.getTime()
+      })
+
+      keys.start.should.equal('_s.mything.apple._.1401613200000');
+      keys.end.should.equal('_s.mything.apple._.1404212400000');
+
+    })
+  })
+
   describe('constructor', function(){
   
     it('should be a function', function(){
       len.should.be.type('function');
-    })
-
-    it('should expose the tools', function(){
-      len.tools.parsedots.should.be.type('function');
-      len.tools.getdots.should.be.type('function');
-      len.tools.querykeys.should.be.type('function');
-      len.tools.schedulekey.should.be.type('function');
-      len.tools.bookingkey.should.be.type('function');
-      len.tools.levelrange.should.be.type('function');
     })
 
     it('should throw if no leveldb or options', function(){
@@ -72,12 +96,12 @@ describe('len', function(){
         }
         
       })
-      batch[0].key.should.equal('schedule~project~a~b~_booking~20~10');
-      batch[1].key.should.equal('schedule~project~a~b~_booking~30~10');
-      batch[2].key.should.equal('schedule~project~a~_booking~20~10');
-      batch[3].key.should.equal('schedule~project~a~_booking~30~10');
-      batch[4].key.should.equal('schedule~project~_booking~20~10');
-      batch[5].key.should.equal('schedule~project~_booking~30~10');
+      batch[0].key.should.equal('_s.project.a.b._.20.10');
+      batch[1].key.should.equal('_s.project.a.b._.30.10');
+      batch[2].key.should.equal('_s.project.a._.20.10');
+      batch[3].key.should.equal('_s.project.a._.30.10');
+      batch[4].key.should.equal('_s.project._.20.10');
+      batch[5].key.should.equal('_s.project._.30.10');
     }
 
     it('should make an add batch', function(done){
@@ -232,6 +256,66 @@ describe('len', function(){
 
 
   describe('booking stream', function(){
+
+
+    it('should fetch all bookings', function(done){
+      var lendb = len(leveldb);
+
+      var dates = {
+        day1_morning:{
+          start:new Date('03/01/2014 09:00:00'),
+          end:new Date('03/01/2014 13:00:00')
+        },
+        day1_afternoon:{
+          start:new Date('03/01/2014 13:30:00'),
+          end:new Date('03/01/2014 18:00:00')
+        },
+        day2:{
+          start:new Date('03/12/2014 09:30:00'),
+          end:new Date('03/12/2014 18:00:00')
+        }
+      }
+
+
+      async.series([
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 10, dates.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
+            name:'day 1 morning'
+          }, next)
+          
+        },
+
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 11, dates.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
+            name:'day 1 afternoon'
+          }, next)
+        },
+
+        function(next){
+
+          lendb.saveBooking('mechanics.bob', 12, dates.day2.start.getTime(), dates.day2.end.getTime(), {
+            name:'day 2'
+          }, next)
+        },
+
+        function(next){
+
+          var bookings = {};
+          var bookingarr = [];
+          lendb.createBookingStream().pipe(through(function(booking){
+            bookings[booking.id] = booking;
+            bookingarr.push(booking);
+          }, function(){
+
+            next();
+          }))
+
+        }
+      ], done)
+
+    })
 
     it('should fetch bookings in the correct time window', function(done){
       var lendb = len(leveldb);

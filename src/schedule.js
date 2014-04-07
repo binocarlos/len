@@ -48,13 +48,26 @@ Schedule.prototype.remove = function(path, id, start, end, callback){
 	this._db.batch(this.removeBatch(path, id, start, end), callback);
 }
 
+// this is where we create several entries per booking so that we can query
+// the layers efficiently
+//
+// booking id = 10, start = 40, end = 50, path = a.b.c
+//
+// a._booking.40.10
+// a.b._booking.40.10
+// a.b.c._booking.40.10
+// a._booking.50.10
+// a.b._booking.50.10
+// a.b.c._booking.50.10
+//
+// would all be created
 Schedule.prototype.addBatch = function(path, id, start, end){
 	var keys = this.keys(path, id, start, end);
 
 	return keys.map(function(key){
 		return {
 			type:'put',
-			key:tools.parsedots(key.path),
+			key:key.path,
 			value:path + '.' + id + ':' + key.type
 		}
 	})
@@ -66,7 +79,7 @@ Schedule.prototype.removeBatch = function(path, id, start, end){
 	return keys.map(function(key){
 		return {
 			type:'del',
-			key:tools.parsedots(key.path)
+			key:key.path
 		}
 	})
 }

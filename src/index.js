@@ -38,7 +38,7 @@ function Len(db, options){
 util.inherits(Len, EventEmitter)
 
 Len.prototype.loadBooking = function(path, id, callback){
-	var key = tools.parsedots(tools.bookingkey(path, id));
+	var key = tools.bookingkey(path, id);
 
 	this._db.get(key, function(err, val){
 		if(err){
@@ -68,7 +68,7 @@ Len.prototype.saveBooking = function(path, id, start, end, meta, callback){
 		var add_batch = self._schedule.addBatch(path, id, start, end);
 		add_batch.push({
 			type:'put',
-			key:tools.parsedots(tools.bookingkey(path, id)),
+			key:tools.bookingkey(path, id),
 			value:JSON.stringify(booking || {})
 		})
 
@@ -88,7 +88,7 @@ Len.prototype.removeBooking = function(path, id, callback){
 		var remove_batch = self._schedule.removeBatch(path, id, booking.start, booking.end);
 		remove_batch.push({
 			type:'del',
-			key:tools.parsedots(tools.bookingkey(path, id))
+			key:tools.bookingkey(path, id)
 		})
 
 		self._db.batch(remove_batch, callback);
@@ -104,10 +104,7 @@ Len.prototype.createBookingStream = function(path, window, callback){
 		window = null;
 	}
 
-
-	console.log('-------------------------------------------');
-	console.dir(start);
-	console.dir(end);
+	var keys = tools.querykeys(path, window);
 
 	var counters = {};
 

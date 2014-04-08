@@ -77,24 +77,22 @@ Len.prototype.saveBooking = function(path, options, callback){
 
 		batch = batch.concat(self._schedule.addBatch(path, id, start, end));
 
-		add_batch.push({
+		batch.push({
 			type:'put',
 			key:tools.bookingkey(path, id),
 			value:JSON.stringify(booking || {})
 		})
 
-		var all_batch = [].concat(remove_batch).concat(add_batch);
-
-		self._db.batch(add_batch, callback);
+		self._db.batch(batch, callback);
 	}
 
 	if(id){
 		this.loadBooking(path, id, function(err, oldbooking){
-			if(err){
-				return callback(err);
+			if(!err && oldbooking){
+				batch = batch.concat(self._schedule.removeBatch(path, id, oldbooking.start, oldbooking.end));	
 			}
-			batch = batch.concat(self._schedule.removeBatch(path, id, oldbooking.start, oldbooking.end));
-			create_booking();
+
+			create_booking();			
 		})
 	}
 	else{

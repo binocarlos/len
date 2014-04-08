@@ -213,9 +213,11 @@ describe('len', function(){
 
         function(next){
 
-          lendb.loadBooking('mechanics.bob', 10, function(err, booking){
+          lendb.loadBooking('mechanics.bob', {
+            id:10
+          }, function(err, booking){
 
-            booking.resource.should.equal('mechanics.bob');
+            booking.path.should.equal('mechanics.bob');
             booking.id.should.equal(10);
             booking.meta.name.should.equal('Fix car');
             booking.start.should.equal(start.getTime());

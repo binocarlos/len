@@ -48,16 +48,26 @@ Len.prototype.loadBooking = function(path, id, callback){
 	})
 }
 
-Len.prototype.saveBooking = function(path, id, start, end, meta, callback){
+Len.prototype.saveBooking = function(path, options, callback){
 	var self = this;
-	this.removeBooking(path, id, function(err){
-		if(err){
-			return callback(err);
+
+	options = options || {};
+
+	var id = options.id;
+	var meta = options.meta;
+	var start = options.start;
+	var end = options.end;
+
+	var batch = [];
+
+	function create_booking(){
+		if(!id){
+			id = tools.littleid();
 		}
 
 		var booking = {
 			id:id,
-			resource:path,
+			path:path,
 			start:start,
 			end:end,
 			meta:meta || {}
@@ -65,16 +75,31 @@ Len.prototype.saveBooking = function(path, id, start, end, meta, callback){
 
 		var booking_string = JSON.stringify(booking);
 
-		var add_batch = self._schedule.addBatch(path, id, start, end);
+		batch = batch.concat(self._schedule.addBatch(path, id, start, end));
+
 		add_batch.push({
 			type:'put',
 			key:tools.bookingkey(path, id),
 			value:JSON.stringify(booking || {})
 		})
 
+		var all_batch = [].concat(remove_batch).concat(add_batch);
+
 		self._db.batch(add_batch, callback);
-	})
-	
+	}
+
+	if(id){
+		this.loadBooking(path, id, function(err, oldbooking){
+			if(err){
+				return callback(err);
+			}
+			batch = batch.concat(self._schedule.removeBatch(path, id, oldbooking.start, oldbooking.end));
+			create_booking();
+		})
+	}
+	else{
+		create_booking();
+	}	
 }
 
 Len.prototype.removeBooking = function(path, id, callback){
@@ -96,39 +121,60 @@ Len.prototype.removeBooking = function(path, id, callback){
 	
 }
 
-Len.prototype.createBookingStream = function(path, window, callback){
-	var self = this;
+Len.prototype.createTimelineStream = function(path, options){
 
-	if(arguments.length<2){
-		callback = window;
-		window = null;
-	}
-
-	var keys = tools.querykeys(path, window);
-
-	var counters = {};
+	var keys = tools.querykeys(path, options);
 
 	return this._db.createReadStream({
-		start:start,
-		end:end,
+		start:keys.start,
+		end:keys.end,
 		keyEncoding:'ascii',
 		valueEncoding:'ascii',
 		keys:true,
 		values:true
-	}).pipe(through(function(key, data){
+	})
+}
 
-		var parts = data.split(':');
-		var id = parts[0];
-		var type = parts[1];
+Len.prototype.createBookingStream = function(path, options, callback){
+	var self = this;
 
-		if(inclusive){
+	options = options || {};
 
-		}
-		
+	var keys = tools.querykeys(path, options);
+
+	var hits = {};
+
+	var timeline_stream = this.createTimelineStream(path, options);
+
+	return timeline_stream.pipe(through(function(entry){
+
+		var key = entry.key.toString();
+		var value = entry.value.toString();
+
+		var keyparts = key.split('.');
+		var id = keyparts.pop();
+		var timestamp = keyparts.pop();
+		var valueparts = value.split(':');
+		var path = valueparts[0];
+		var type = valueparts[1];
 
 		console.log('-------------------------------------------');
-		console.dir(key);
-		console.dir(data);
+		console.dir('id: ' + id);
+		console.dir('timestamp: ' + timestamp);
+		console.dir('path: ' + path);
+		console.dir('type: ' + type);
 
+		if(options.inclusive){
+
+		}
+
+		this.queue({
+			id:id,
+			timestamp:timestamp,
+			type:type
+		})
+	}, function(){
+		callback && callback();
+		this.emit('end');
 	}))
 }

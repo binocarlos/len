@@ -35,6 +35,9 @@
   "homepage": "https://github.com/binocarlos/lem",
   "dependencies": {
     "level": "~0.18.0",
-    "level-live-stream": "~1.4.9"
+    "level-live-stream": "~1.4.9",
+    "event-stream": "^3.1.1",
+    "date-floor": "0.0.2",
+    "timestamp-series": "0.0.2"
   }
 }

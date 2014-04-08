@@ -42,6 +42,28 @@ describe('len', function(){
       testceil.should.equal(ceil.getTime());
     })
 
+
+    it('query keys should handle blank path', function(){
+
+      var keys = tools.querykeys();
+
+      keys.start.should.equal('_s._.');
+      keys.end.should.equal('_s._.\xff');
+
+    }) 
+
+    it('query keys should handle blank window', function(){
+
+      var keys = tools.querykeys('mything.apple', {
+        start:null,
+        end:null
+      });
+
+      keys.start.should.equal('_s.mything.apple._.');
+      keys.end.should.equal('_s.mything.apple._.\xff');
+
+    })    
+
     it('should get querykeys', function(){
 
       var start = new Date('06/01/2014 09:00:00');
@@ -54,6 +76,31 @@ describe('len', function(){
 
       keys.start.should.equal('_s.mything.apple._.1401613200000');
       keys.end.should.equal('_s.mything.apple._.1404212400000');
+
+    })
+
+
+    it('should get a littleid', function(){
+
+      var id = tools.littleid();
+
+      id.length.should.equal(6);
+
+    })
+
+
+    it('should get schedulekeys', function(){
+
+      var start = new Date('06/01/2014 09:00:00');
+      var end = new Date('07/01/2014 11:00:00');
+
+      var startpath = tools.schedulekey('apples.pears', start.getTime(), 10);
+
+      startpath.should.equal('_s.apples.pears._.' + start.getTime() + '.10');
+
+      var emptypath = tools.schedulekey('', start.getTime(), 10);
+
+      emptypath.should.equal('_s._.' + start.getTime() + '.10');
 
     })
   })
@@ -81,37 +128,47 @@ describe('len', function(){
 
   describe('schedule', function(){
 
+    var start = new Date('01/03/2014 09:00:00');
+    var end = new Date('01/13/2014 13:00:00');
+
+    var start_time = start.getTime();
+    var end_time = end.getTime();
+
     function test_batch(batch, type){
 
-      batch.length.should.equal(6);
+      batch.length.should.equal(8);
 
       batch.forEach(function(instruction){
         instruction.type.should.equal(type);
 
         if(instruction.value){
-
           var hit = instruction.value.match(/^project\.a\.b\.10:/);
 
           (hit ? true : false).should.equal(true);
         }
         
       })
-      batch[0].key.should.equal('_s.project.a.b._.20.10');
-      batch[1].key.should.equal('_s.project.a.b._.30.10');
-      batch[2].key.should.equal('_s.project.a._.20.10');
-      batch[3].key.should.equal('_s.project.a._.30.10');
-      batch[4].key.should.equal('_s.project._.20.10');
-      batch[5].key.should.equal('_s.project._.30.10');
+      
+      batch[0].key.should.equal('_s.project.a.b._.' + start_time + '.10');
+      batch[1].key.should.equal('_s.project.a.b._.' + end_time + '.10');
+      batch[2].key.should.equal('_s.project.a._.' + start_time + '.10');
+      batch[3].key.should.equal('_s.project.a._.' + end_time + '.10');
+      batch[4].key.should.equal('_s.project._.' + start_time + '.10');
+      batch[5].key.should.equal('_s.project._.' + end_time + '.10');
+      batch[6].key.should.equal('_s._.' + start_time + '.10');
+      batch[7].key.should.equal('_s._.' + end_time + '.10');
     }
 
     it('should make an add batch', function(done){
 
       var lendb = len(leveldb);
 
-      var batch = lendb._schedule.addBatch('project.a.b', 10, 20, 30);
+
+
+      var batch = lendb._schedule.addBatch('project.a.b', start_time, end_time, 10);
 
       test_batch(batch, 'put');
-      
+
       done();
 
     })
@@ -121,7 +178,7 @@ describe('len', function(){
 
       var lendb = len(leveldb);
 
-      var batch = lendb._schedule.removeBatch('project.a.b', 10, 20, 30);
+      var batch = lendb._schedule.removeBatch('project.a.b', start_time, end_time, 10);
 
       test_batch(batch, 'del');
       done();
@@ -141,8 +198,13 @@ describe('len', function(){
       async.series([
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 10, start.getTime(), end.getTime(), {
-            name:'Fix car'
+          lendb.saveBooking('mechanics.bob', {
+            id:10,
+            start:start.getTime(),
+            end:end.getTime(),
+            meta:{
+              name:'Fix car'
+            }
           }, function(err){
             next(err);
           })
@@ -178,8 +240,13 @@ describe('len', function(){
       async.series([
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 10, start.getTime(), end.getTime(), {
-            name:'Fix car'
+          lendb.saveBooking('mechanics.bob', {
+            id:10,
+            start:start.getTime(),
+            end:end.getTime(),
+            meta:{
+              name:'Fix car'
+            }
           }, function(err){
             next(err);
           })
@@ -217,8 +284,13 @@ describe('len', function(){
       async.series([
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 10, start.getTime(), end.getTime(), {
-            name:'Fix car'
+          lendb.saveBooking('mechanics.bob', {
+            id:10,
+            start:start.getTime(),
+            end:end.getTime(),
+            meta:{
+              name:'Fix car'
+            }
           }, function(err){
             next(err);
           })
@@ -228,8 +300,13 @@ describe('len', function(){
         function(next){
 
           
-          lendb.saveBooking('mechanics.bob', 10, start.getTime()+10, end.getTime(), {
-            name:'Fix car2'
+          lendb.saveBooking('mechanics.bob', {
+            id:10,
+            start:start.getTime()+10,
+            end:end.getTime(),
+            meta:{
+              name:'Fix car2'
+            }
           }, function(err){
             next(err);
           })
@@ -259,6 +336,7 @@ describe('len', function(){
 
 
     it('should fetch all bookings', function(done){
+
       var lendb = len(leveldb);
 
       var dates = {
@@ -280,23 +358,38 @@ describe('len', function(){
       async.series([
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 10, dates.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
-            name:'day 1 morning'
+          lendb.saveBooking('mechanics.bob', {
+            id:10,
+            start:dates.day1_morning.start.getTime(),
+            end:dates.day1_morning.end.getTime(),
+            meta:{
+              name:'day 1 morning'
+            }
           }, next)
           
         },
 
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 11, dates.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
-            name:'day 1 afternoon'
+          lendb.saveBooking('mechanics.bob', {
+            id:11,
+            start:dates.day1_afternoon.start.getTime(),
+            end:dates.day1_afternoon.end.getTime(),
+            meta:{
+              name:'day 1 afternoon'
+            }
           }, next)
         },
 
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 12, dates.day2.start.getTime(), dates.day2.end.getTime(), {
-            name:'day 2'
+          lendb.saveBooking('mechanics.bob', {
+            id:12,
+            start:dates.day2.start.getTime(),
+            end:dates.day2.end.getTime(),
+            meta:{
+              name:'day 2'
+            }
           }, next)
         },
 
@@ -305,9 +398,20 @@ describe('len', function(){
           var bookings = {};
           var bookingarr = [];
           lendb.createBookingStream().pipe(through(function(booking){
+            
+            console.log('-------------------------------------------');
+            console.dir(booking);
             bookings[booking.id] = booking;
             bookingarr.push(booking);
+            
           }, function(){
+
+            console.log('-------------------------------------------');
+            console.log('-------------------------------------------');
+            console.log('-------------------------------------------');
+            console.dir(bookings);
+            console.dir(bookingarr);
+            process.exit();
 
             next();
           }))
@@ -339,23 +443,38 @@ describe('len', function(){
       async.series([
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 10, dates.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
-            name:'day 1 morning'
+          lendb.saveBooking('mechanics.bob', {
+            id:10,
+            start:dates.day1_morning.start.getTime(),
+            end:dates.day1_morning.end.getTime(),
+            meta:{
+              name:'day 1 morning'
+            }
           }, next)
           
         },
 
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 11, dates.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
-            name:'day 1 afternoon'
+          lendb.saveBooking('mechanics.bob', {
+            id:11,
+            start:dates.day1_afternoon.start.getTime(),
+            end:dates.day1_afternoon.end.getTime(),
+            meta:{
+              name:'day 1 afternoon'
+            }
           }, next)
         },
 
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 12, dates.day2.start.getTime(), dates.day2.end.getTime(), {
-            name:'day 2'
+          lendb.saveBooking('mechanics.bob', {
+            id:12,
+            start:dates.day2.start.getTime(),
+            end:dates.day2.end.getTime(),
+            meta:{
+              name:'day 2'
+            }
           }, next)
         },
 
@@ -510,11 +629,21 @@ describe('len', function(){
       async.series([
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 10, dates.bob.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
-            name:'day 1 morning'
-          }, function(){
-            lendb.saveBooking('mechanics.dave', 10, dates.dave.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
+          lendb.saveBooking('mechanics.bob', {
+            id:10,
+            start:dates.bob.day1_morning.start.getTime(),
+            end:dates.day1_morning.end.getTime(),
+            meta:{
               name:'day 1 morning'
+            }
+          }, function(){
+            lendb.saveBooking('mechanics.dave', {
+              id:10,
+              start:dates.dave.day1_morning.start.getTime(),
+              end:dates.day1_morning.end.getTime(),
+              meta:{
+                name:'day 1 morning'
+              }
             }, next)
           })
           
@@ -522,22 +651,42 @@ describe('len', function(){
 
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 11, dates.bob.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
-            name:'day 1 afternoon'
-          }, function(){
-            lendb.saveBooking('mechanics.dave', 11, dates.dave.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
+          lendb.saveBooking('mechanics.bob', {
+            id:11,
+            start:dates.bob.day1_afternoon.start.getTime(),
+            end:dates.day1_afternoon.end.getTime(),
+            meta:{
               name:'day 1 afternoon'
+            }
+          }, function(){
+            lendb.saveBooking('mechanics.dave', {
+              id:11,
+              start:dates.dave.day1_afternoon.start.getTime(),
+              end:dates.day1_afternoon.end.getTime(),
+              meta:{
+                name:'day 1 afternoon'
+              }
             }, next);
           })
         },
 
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 12, dates.bob.day2.start.getTime(), dates.day2.end.getTime(), {
-            name:'day 2'
-          }, function(){
-            lendb.saveBooking('mechanics.dave', 12, dates.dave.day2.start.getTime(), dates.day2.end.getTime(), {
+          lendb.saveBooking('mechanics.bob', {
+            id:12,
+            start:dates.bob.day2.start.getTime(),
+            end:dates.day2.end.getTime(),
+            meta:{
               name:'day 2'
+            }
+          }, function(){
+            lendb.saveBooking('mechanics.dave', {
+              id:12,
+              start:dates.dave.day2.start.getTime(),
+              end:dates.day2.end.getTime(),
+              meta:{
+                name:'day 2'
+              }
             }, next)
           })
         },
@@ -589,23 +738,38 @@ describe('len', function(){
       async.series([
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 10, dates.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
-            name:'day 1 morning'
+          lendb.saveBooking('mechanics.bob', {
+            id:10,
+            start:dates.day1_morning.start.getTime(),
+            end:dates.day1_morning.end.getTime(),
+            meta:{
+              name:'day 1 morning'
+            }
           }, next)
           
         },
 
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 11, dates.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
-            name:'day 1 afternoon'
+          lendb.saveBooking('mechanics.bob', {
+            id:11,
+            start:dates.day1_afternoon.start.getTime(),
+            end:dates.day1_afternoon.end.getTime(),
+            meta:{
+              name:'day 1 afternoon'
+            }
           }, next)
         },
 
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 12, dates.day2.start.getTime(), dates.day2.end.getTime(), {
-            name:'day 2'
+          lendb.saveBooking('mechanics.bob', {
+            id:12,
+            start:dates.day2.start.getTime(),
+            end:dates.day2.end.getTime(),
+            meta:{
+              name:'day 2'
+            }
           }, next)
         },
 
@@ -693,11 +857,21 @@ describe('len', function(){
       async.series([
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 10, dates.bob.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
-            name:'day 1 morning'
-          }, function(){
-            lendb.saveBooking('mechanics.dave', 10, dates.dave.day1_morning.start.getTime(), dates.day1_morning.end.getTime(), {
+          lendb.saveBooking('mechanics.bob', {
+            id:10,
+            start:dates.bob.day1_morning.start.getTime(),
+            end:dates.day1_morning.end.getTime(),
+            meta:{
               name:'day 1 morning'
+            }
+          }, function(){
+            lendb.saveBooking('mechanics.dave', {
+              id:10,
+              start:dates.dave.day1_morning.start.getTime(),
+              end:dates.day1_morning.end.getTime(),
+              meta:{
+                name:'day 1 morning'
+              }
             }, next)
           })
           
@@ -705,19 +879,34 @@ describe('len', function(){
 
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 11, dates.bob.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
-            name:'day 1 afternoon'
-          }, function(){
-            lendb.saveBooking('mechanics.dave', 11, dates.dave.day1_afternoon.start.getTime(), dates.day1_afternoon.end.getTime(), {
+          lendb.saveBooking('mechanics.bob', {
+            id:11,
+            start:dates.bob.day1_afternoon.start.getTime(),
+            end:dates.day1_afternoon.end.getTime(),
+            meta:{
               name:'day 1 afternoon'
+            }
+          }, function(){
+            lendb.saveBooking('mechanics.dave', {
+              id:11,
+              start:dates.dave.day1_afternoon.start.getTime(),
+              end:dates.day1_afternoon.end.getTime(),
+              meta:{
+                name:'day 1 afternoon'
+              }
             }, next);
           })
         },
 
         function(next){
 
-          lendb.saveBooking('mechanics.bob', 12, dates.bob.day2.start.getTime(), dates.day2.end.getTime(), {
-            name:'day 2'
+          lendb.saveBooking('mechanics.bob', {
+            id:12,
+            start:dates.bob.day2.start.getTime(),
+            end:dates.day2.end.getTime(),
+            meta:{
+              name:'day 2'
+            }
           }, function(){
             lendb.saveBooking('mechanics.dave', 12, dates.dave.day2.start.getTime(), dates.day2.end.getTime(), {
               name:'day 2'

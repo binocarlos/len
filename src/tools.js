@@ -26,22 +26,6 @@ function pad_timestamp(stamp){
 	return stamp;
 }
 
-function bookingkey(path, id){
-	return '_b.' + path;
-}
-
-function dayindexkey(path, id){
-	return '_d.' + path + '.' + id;
-}
-
-function schedulekey(path, time, id){
-	if(path){
-		path += '.';
-	}
-
-	return '_s.' + path + '_.' + pad_timestamp(time) + '.' + id;
-}
-
 function querykeys(path, window){
 
 	if(!path){
@@ -102,8 +86,6 @@ module.exports = {
 	littleid:littleid,
 	day_timestamp:day_timestamp,
 	pad_timestamp:pad_timestamp,
-	bookingkey:bookingkey,
-	schedulekey:schedulekey,
 	querykeys:querykeys,
 	levelrange:levelrange
 }

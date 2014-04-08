@@ -5,6 +5,7 @@ var through = require('through');
 var http = require('http');
 var async = require('async');
 var wrench = require('wrench');
+var datefloor = require('date-floor');
 
 var tools = require('../src/tools');
 
@@ -43,43 +44,6 @@ describe('len', function(){
     })
 
 
-    it('query keys should handle blank path', function(){
-
-      var keys = tools.querykeys();
-
-      keys.start.should.equal('_s._.');
-      keys.end.should.equal('_s._.\xff');
-
-    }) 
-
-    it('query keys should handle blank window', function(){
-
-      var keys = tools.querykeys('mything.apple', {
-        start:null,
-        end:null
-      });
-
-      keys.start.should.equal('_s.mything.apple._.');
-      keys.end.should.equal('_s.mything.apple._.\xff');
-
-    })    
-
-    it('should get querykeys', function(){
-
-      var start = new Date('06/01/2014 09:00:00');
-      var end = new Date('07/01/2014 11:00:00');
-
-      var keys = tools.querykeys('mything.apple', {
-        start:start.getTime(),
-        end:end.getTime()
-      })
-
-      keys.start.should.equal('_s.mything.apple._.1401613200000');
-      keys.end.should.equal('_s.mything.apple._.1404212400000');
-
-    })
-
-
     it('should get a littleid', function(){
 
       var id = tools.littleid();
@@ -88,21 +52,6 @@ describe('len', function(){
 
     })
 
-
-    it('should get schedulekeys', function(){
-
-      var start = new Date('06/01/2014 09:00:00');
-      var end = new Date('07/01/2014 11:00:00');
-
-      var startpath = tools.schedulekey('apples.pears', start.getTime(), 10);
-
-      startpath.should.equal('_s.apples.pears._.' + start.getTime() + '.10');
-
-      var emptypath = tools.schedulekey('', start.getTime(), 10);
-
-      emptypath.should.equal('_s._.' + start.getTime() + '.10');
-
-    })
   })
 
   describe('constructor', function(){
@@ -122,67 +71,6 @@ describe('len', function(){
 
       lendb.on('apples', done);
       lendb.emit('apples');
-    })
-
-  })
-
-  describe('schedule', function(){
-
-    var start = new Date('01/03/2014 09:00:00');
-    var end = new Date('01/13/2014 13:00:00');
-
-    var start_time = start.getTime();
-    var end_time = end.getTime();
-
-    function test_batch(batch, type){
-
-      batch.length.should.equal(8);
-
-      batch.forEach(function(instruction){
-        instruction.type.should.equal(type);
-
-        if(instruction.value){
-          var hit = instruction.value.match(/^project\.a\.b\.10:/);
-
-          (hit ? true : false).should.equal(true);
-        }
-        
-      })
-      
-      batch[0].key.should.equal('_s.project.a.b._.' + start_time + '.10');
-      batch[1].key.should.equal('_s.project.a.b._.' + end_time + '.10');
-      batch[2].key.should.equal('_s.project.a._.' + start_time + '.10');
-      batch[3].key.should.equal('_s.project.a._.' + end_time + '.10');
-      batch[4].key.should.equal('_s.project._.' + start_time + '.10');
-      batch[5].key.should.equal('_s.project._.' + end_time + '.10');
-      batch[6].key.should.equal('_s._.' + start_time + '.10');
-      batch[7].key.should.equal('_s._.' + end_time + '.10');
-    }
-
-    it('should make an add batch', function(done){
-
-      var lendb = len(leveldb);
-
-
-
-      var batch = lendb._schedule.addBatch('project.a.b', start_time, end_time, 10);
-
-      test_batch(batch, 'put');
-
-      done();
-
-    })
-
-
-    it('should make an remove batch', function(done){
-
-      var lendb = len(leveldb);
-
-      var batch = lendb._schedule.removeBatch('project.a.b', start_time, end_time, 10);
-
-      test_batch(batch, 'del');
-      done();
-
     })
 
   })
@@ -213,9 +101,7 @@ describe('len', function(){
 
         function(next){
 
-          lendb.loadBooking('mechanics.bob', {
-            id:10
-          }, function(err, booking){
+          lendb.loadBooking('mechanics.bob', 10, function(err, booking){
 
             booking.path.should.equal('mechanics.bob');
             booking.id.should.equal(10);
@@ -256,6 +142,9 @@ describe('len', function(){
         },
 
         function(next){
+
+          console.log('-------------------------------------------');
+          console.log('removing');
 
           lendb.removeBooking('mechanics.bob', 10, next);
 
@@ -336,7 +225,6 @@ describe('len', function(){
 
   describe('booking stream', function(){
 
-
     it('should fetch all bookings', function(done){
 
       var lendb = len(leveldb);
@@ -401,19 +289,18 @@ describe('len', function(){
           var bookingarr = [];
           lendb.createBookingStream().pipe(through(function(booking){
             
-            console.log('-------------------------------------------');
-            console.dir(booking);
             bookings[booking.id] = booking;
             bookingarr.push(booking);
             
           }, function(){
 
-            console.log('-------------------------------------------');
-            console.log('-------------------------------------------');
-            console.log('-------------------------------------------');
-            console.dir(bookings);
-            console.dir(bookingarr);
-            process.exit();
+            bookingarr.length.should.equal(3);
+            bookingarr[0].id.should.equal(10);
+            bookingarr[0].meta.name.should.equal('day 1 morning');
+            bookingarr[1].id.should.equal(11);
+            bookingarr[1].meta.name.should.equal('day 1 afternoon');
+            bookingarr[2].id.should.equal(12);
+            bookingarr[2].meta.name.should.equal('day 2');
 
             next();
           }))

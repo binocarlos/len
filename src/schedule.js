@@ -16,40 +16,6 @@ util.inherits(Schedule, EventEmitter)
 
 module.exports = Schedule;
 
-// return the keys for a path such that each start and end is written to each level in the path
-Schedule.prototype.ancestorkeys = function(path, start, end, id){
-	var parts = path.split('.');
-	var keys = [];
-
-	function add_key(usepath){
-		var startpath = tools.schedulekey(usepath, start, id);
-		var endpath = tools.schedulekey(usepath, end, id);
-
-		keys.push({
-			path:startpath,
-			type:'start'
-		})
-
-		keys.push({
-			path:endpath,
-			type:'end'
-		})
-	}
-
-	while(parts.length>0){
-		var usepath = parts.join('.');
-
-		add_key(usepath);
-
-		parts.pop();
-	}
-
-	add_key('');
-
-	return keys;
-}
-
-
 // return an array of timestamps that are one per day (inclusive of end days) for a range
 Schedule.prototype.daykeys = function(path, start, end){
 
@@ -57,7 +23,7 @@ Schedule.prototype.daykeys = function(path, start, end){
 	var endday = datefloor(start, 'day');
 
 	return timestampseries('day', start, end).map(function(day_timestamp){
-
+		return '_d'
 	})
 }
 
@@ -69,54 +35,60 @@ Schedule.prototype.remove = function(path, start, end, callback){
 	this._db.batch(this.removeBatch(path, start, end), callback);
 }
 
-// this is where we create several entries per booking so that we can query
-// the layers efficiently
-//
-// booking id = 10, start = 40, end = 50, path = a.b.c
-//
-// a._booking.40.10
-// a.b._booking.40.10
-// a.b.c._booking.40.10
-// a._booking.50.10
-// a.b._booking.50.10
-// a.b.c._booking.50.10
-//
-// would all be created
-Schedule.prototype.addBatch = function(path, start, end, id){
-	var ancestorkeys = this.ancestorkeys(path, start, end, id);
+Schedule.prototype.addBatch = function(booking){
+	if(!booking.start || !booking.end){
+		throw new Error('booking must have a start and an end');
+	}
 
-	var ancestorinserts = ancestorkeys.map(function(key){
-		return {
-			type:'put',
-			key:key.path,
-			value:path + '.' + id + ':' + key.type
-		}
+	var booking_string = JSON.stringify(booking || {});
+	var booking_path = '_b.' + booking.path + '.' + booking.id;
+	var tree_path = '_t.' + booking.path;
+
+	var batch = [];
+	
+	// an entry in the tree so we can get descendents
+	batch.push({
+		type:'put',
+		key:tree_path,
+		value:booking_path
 	})
 
-/*
-	var dayinserts = ancestorkeys.map(function(key){
-		return {
-			type:'put',
-			key:key.path,
-			value:path + '.' + id + ':' + key.type
-		}
+	// the main booking entry
+	batch.push({
+		type:'put',
+		key:booking_path,
+		value:booking_string
 	})
 
-	var allinserts = [].concat(ancestorinserts);
-	*/
-	return ancestorinserts;
+	batch.push({
+		type:'put',
+		key:'_s.' + booking.path + '.' + booking.start + '.' + booking.id,
+		value:booking_path
+	})
+
+	batch.push({
+		type:'put',
+		key:'_s.' + booking.path + '.' + booking.end + '.' + booking.id,
+		value:booking_path
+	})
+
+	var days = timestampseries('day', booking.start, booking.end);
+
+	batch = batch.concat(days.map(function(day){
+		return {
+			type:'put',
+			key:'_d.' + day + '.' + booking.path + '.' + booking.id,
+			value:booking_path
+		}
+	}))
+
+	return batch;
 }
 
-Schedule.prototype.removeBatch = function(path, start, end, id){
-	var ancestorkeys = this.ancestorkeys(path, start, end, id);
-
-	var ancestordels = ancestorkeys.map(function(key){
-		return {
-			type:'del',
-			key:key.path
-		}
+Schedule.prototype.removeBatch = function(booking){
+	return this.addBatch(booking).map(function(entry){
+		entry.type = 'del';
+		delete(entry.value);
+		return entry;
 	})
-
-	var alldels = [].concat(ancestordels);
-	return alldels;
 }

@@ -37,9 +37,14 @@ var start = new Date('03/04/14 09:30:00');
 // end at 13.30
 var end = new Date('03/04/14 13:30:00');
 
-lendb.saveBooking('/mechanics/bob', 14, start.getTime(), end.getTime(), {
-	name:'Fix Car',
-	customer:34
+lendb.saveBooking('/mechanics/bob', {
+	id:14, 
+	start:start.getTime(),
+	end:end.getTime(),
+	meta:{
+		name:'Fix Car',
+		customer:34
+	}
 }, function(error, booking){
 
 	// bob is all booked in
@@ -103,7 +108,9 @@ get a readstream of bookings:
 
 ```
 // bookings for one project
-lendb.createBookingStream('team.alpha.project.1')
+lendb.createBookingStream('team.alpha.project.1').pipe(through(function(booking){
+	// booking is an object
+}))
 
 // bookings for one team's projects
 lendb.createBookingStream('team.alpha.project')
@@ -123,7 +130,7 @@ lendb.createBookingStream('team.alpha.project', {
 
 ## api
 
-### var lendb = len(leveldb);
+#### `len(leveldb);`
 
 Create a new len database from the provided [leveldb](https://github.com/rvagg/node-levelup).  This can be a [level-sublevel](https://github.com/dominictarr/level-sublevel) so you can partition len into an existing database.
 
@@ -135,7 +142,7 @@ var leveldb = level('/tmp/mylem');
 var lendb = len(leveldb);
 ```
 
-### lendb.loadBooking(resourcepath, bookingid, start, end, meta, callback)
+#### `lendb.loadBooking(resourcepath, bookingid, callback)`
 
 Fetch a booking record using the resourcepath and booking id:
 
@@ -147,9 +154,23 @@ lendb.loadBooking('project.1', 14, function(err, booking){
 })
 ```
 
-### lendb.saveBooking(resourcepath, bookingid, start, end, meta, callback)
+#### `lendb.saveBooking(resourcepath, booking, callback)`
 
 Insert/update a booking into the schedule for a resource.
+
+booking is an object:
+
+``` js
+{
+	id: 0,                   // the id of the booking you are saving - this is auto-created is left blank
+	start: 1388739600000,    // the start timestamp of the booking
+	end: 1389618000000,      // the end timestamp of the booking
+	meta: {                  // an object with anything you like for the booking meta-data
+		customer:12,
+		comments:'apples'
+	}
+}
+```
 
 The start and end timestamps are required - the meta object is converted to a JSON string and is returned in the 'meta' property of bookings.
 
@@ -166,7 +187,7 @@ lendb.createBooking('project.1', 14, start.getTime(), end.getTime(), {
 })
 ```
 
-### lendb.removeBooking(resourcepath, bookingid, callback)
+#### `lendb.removeBooking(resourcepath, bookingid, callback)`
 
 Remove a booking from the schedule
 
@@ -178,7 +199,7 @@ resource.removeBooking('project.1', 14, function(err){
 })
 ```
 
-### lendb.removeResource(resourcepath, callback)
+#### `lendb.removeResource(resourcepath, callback)`
 
 Completely remove a resource and all of its descendents from the database
 
@@ -189,7 +210,7 @@ lendb.remove('projects.1', function(err, project){
 ```
 
 
-### lendb.getRange(resourcepath, [window], callback)
+#### `lendb.getRange(resourcepath, [window], callback)`
 
 Use this to get the start and end date for bookings in a resource
 
@@ -212,7 +233,7 @@ lendb.getRange('projects.1', {
 })
 ```
 
-### lendb.createBookingStream(resourcepath, [window], callback)
+#### `lendb.createBookingStream(resourcepath, [window], callback)`
 
 Use this to get an object stream of bookings for a given resource.
 
@@ -258,7 +279,7 @@ the inclusive option controls whether bookings have to start and end inside the 
 
 ## events
 
-### lendb.on('booking', function(key, action, booking){})
+#### `lendb.on('booking', function(key, action, booking){})`
 
 called when a booking is changed - action is 'add', 'edit', or 'delete'
 
@@ -268,7 +289,7 @@ lemdb.on('booking', function(key, action, booking){
 })
 ```
 
-### lendb.on('data', function(key, data){})
+#### `lendb.on('data', function(key, data){})`
 
 called when any data is changed in the database
 

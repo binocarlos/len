@@ -56,10 +56,18 @@ Len.prototype.saveBooking = function(path, options, callback){
 
 	options = options || {};
 
+	if(!options.start){
+		throw new Error('start needed');
+	}
+
+	if(!options.end){
+		throw new Error('end needed');
+	}
+
 	var id = options.id;
 	var meta = options.meta;
-	var start = options.start;
-	var end = options.end;
+	var start = options.start.getTime();
+	var end = options.end.getTime();
 
 	var batch = [];
 
@@ -253,13 +261,25 @@ Len.prototype.createBookingStream = function(path, window){
 				var startinside = booking.start >= window.start.getTime();
 				var endinside = booking.end <= window.end.getTime();
 
-				var isahit = window.inclusive ? startinside && endinside : startinside || endinside;
-
-				if(isahit){
-					callback(null, booking);	
+				if(window.inclusive){
+					if(startinside && endinside){
+						callback(null, booking);
+					}
+					else{
+						callback();
+					}
 				}
 				else{
-					callback();
+					// the booking spans the entire window
+					if(booking.start<=window.start.getTime() && booking.end>=window.end.getTime()){
+						callback(null, booking);
+					}
+					else if (startinside || endinside){
+						callback(null, booking);
+					}
+					else{
+						callback();
+					}
 				}
 			})
 		}))

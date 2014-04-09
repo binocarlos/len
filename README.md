@@ -101,7 +101,7 @@ This can be done using the paths you give to resources - if we create resources 
 
 Then we can ask for the start and end for one project:
 
-```
+```js
 lendb.getRange('team.alpha.project.1', function(err, bounds){
 	// bounds.start = timestamp of the earliest start of booking for the project
 	// bounds.end = timestamp of the latest end of booking for the project
@@ -110,7 +110,7 @@ lendb.getRange('team.alpha.project.1', function(err, bounds){
 
 get a readstream of bookings:
 
-```
+```js
 // bookings for one project
 lendb.createBookingStream('team.alpha.project.1').pipe(through(function(booking){
 	// booking is an object
@@ -122,7 +122,7 @@ lendb.createBookingStream('team.alpha.project')
 
 get a readstream of bookings withing a time period
 
-```
+```js
 var start = new Date('03/04/14 09:30:00');
 var end = new Date('03/04/14 13:30:00');
 

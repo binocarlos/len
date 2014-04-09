@@ -20,6 +20,8 @@ function day_timestamp(stamp, end){
 }
 
 function pad_timestamp(stamp){
+	stamp = '' + stamp;
+	
 	while(stamp.length<13){
 		stamp = '0' + stamp;
 	}

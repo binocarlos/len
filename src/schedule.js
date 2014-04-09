@@ -42,16 +42,8 @@ Schedule.prototype.addBatch = function(booking){
 
 	var booking_string = JSON.stringify(booking || {});
 	var booking_path = '_b.' + booking.path + '.' + booking.id;
-	var tree_path = '_t.' + booking.path;
 
 	var batch = [];
-	
-	// an entry in the tree so we can get descendents
-	batch.push({
-		type:'put',
-		key:tree_path,
-		value:booking_path
-	})
 
 	// the main booking entry
 	batch.push({
@@ -62,13 +54,13 @@ Schedule.prototype.addBatch = function(booking){
 
 	batch.push({
 		type:'put',
-		key:'_s.' + booking.path + '.' + booking.start + '.' + booking.id,
+		key:'_s.' + booking.start + '.' + booking.path + '.' + booking.id,
 		value:booking_path
 	})
 
 	batch.push({
 		type:'put',
-		key:'_s.' + booking.path + '.' + booking.end + '.' + booking.id,
+		key:'_s.' + booking.end + '.' + booking.path + '.' + booking.id,
 		value:booking_path
 	})
 

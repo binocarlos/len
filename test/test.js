@@ -288,6 +288,10 @@ describe('len', function(){
           var bookings = {};
           var bookingarr = [];
           lendb.createBookingStream().pipe(through(function(booking){
+
+            console.log('-------------------------------------------');
+            console.log('-------------------------------------------');
+            console.dir(booking);
             
             bookings[booking.id] = booking;
             bookingarr.push(booking);

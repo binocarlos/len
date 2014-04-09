@@ -5,6 +5,7 @@ var through = require('through');
 var tools = require('./tools');
 var datefloor = require('date-floor');
 var async = require('async');
+var es = require('event-stream');
 
 var Schedule = require('./schedule');
 
@@ -110,13 +111,63 @@ Len.prototype.removeBooking = function(path, id, callback){
 	
 }
 
-Len.prototype.createTimelineStream = function(path, options){
+Len.prototype.toStringStream = function(){
+	return through(function(entry){
+		entry.key = entry.key.toString();
+		entry.value = entry.value.toString();
+		this.queue(entry);
+	})
+}
 
-	var keys = tools.querykeys(path, options);
+Len.prototype.createScheduleStream = function(path, window){
+	var self = this;
 
-	console.log('-------------------------------------------');
-	console.dir(keys);
+	var schedulestart = '_s.' + tools.pad_timestamp(window.start.getTime()) + '.' + path;;
+	var scheduleend = '_s.' + tools.pad_timestamp(window.end.getTime()) + '.' + path;
 
+	return self._db.createReadStream({
+		start:schedulestart,
+		end:scheduleend,
+		keyEncoding:'ascii',
+		valueEncoding:'ascii',
+		keys:true,
+		values:true
+	})
+	
+}
+
+Len.prototype.createDayStreams = function(path, window){
+	var self = this;
+	var start_day = datefloor(window.start, 'day');
+	var end_day = datefloor(window.end, 'day');
+
+	var daystart = '_d.' + tools.pad_timestamp(start_day.getTime()) + '.' + path;
+	var dayend = '_d.' + tools.pad_timestamp(end_day.getTime()) + '.' + path;
+
+	// all the bookings under the path for the single start day
+	var start_stream = self._db.createReadStream({
+		start:daystart,
+		end:daystart + '\xff',
+		keyEncoding:'ascii',
+		valueEncoding:'ascii',
+		keys:true,
+		values:true
+	})
+
+	// all the bookings under the path for the single end day
+	var end_stream = self._db.createReadStream({
+		start:dayend,
+		end:dayend + '\xff',
+		keyEncoding:'ascii',
+		valueEncoding:'ascii',
+		keys:true,
+		values:true
+	})
+
+	return {
+		start:start_stream,
+		end:end_stream
+	}
 }
 
 Len.prototype.createBookingStream = function(path, window){
@@ -127,103 +178,58 @@ Len.prototype.createBookingStream = function(path, window){
 		path = null;
 	}
 
-	var nextbookingstream = null;
-	
-	var bookingstream = es.readable(function (count, callback) {
+	path = path || '';
 
-		nextbookingstream = callback;
-	  
+	window = window || {};
+
+	if(!window.start){
+		window.start = new Date('01/01/1980 00:00:00');
+	}
+
+	if(!window.end){
+		window.end = new Date('01/01/2035 00:00:00');
+	}
+
+	var scheduleStream = this.createScheduleStream(path, {
+		start:window.start,
+		end:window.end
 	})
 
-	async.series([
+	var dayStreams = this.createDayStreams(path, {
+		start:window.start,
+		end:window.end
+	})
 
-		// get the nodes below the search path
-		function(next){
+	var bookings_seen = {};
+	var bookings_included = {};
 
-			self._db.createReadStream({
-				start:'_t.' + path,
-				end:'_t.' + path + '\xff',
-				keyEncoding:'ascii',
-				valueEncoding:'ascii',
-				keys:true,
-				values:true
-			}).pipe(through(function(entry){
+	return es
+		.merge(scheduleStream, dayStreams.start, dayStreams.end)
+		.pipe(this.toStringStream())
+		.pipe(es.map(function(data, callback){
 
-				self._db.createReadStream({
-					start:'_t.' + path,
-					end:'_t.' + path + '\xff',
-					keyEncoding:'ascii',
-					valueEncoding:'ascii',
-					keys:true,
-					values:true
-				}).pipe(through(function(entry){
+			var bookingid = data.value;
 
+			if(bookings_seen[bookingid]){
+				return callback();
+			}
 
-			}, function(){
-				callback && callback();
-				this.emit('end');
-			}))
-		}
+			bookings_seen[bookingid] = true;
 
-	])
+			self._db.get(bookingid, function(err, booking){
+				if(err){
+					return callback(err);
+				}
 
+				booking = JSON.parse(booking.toString());
 
-	var start_key = null;
-	var end_key = null;
-
-	var day_index_start = null;
-	var day_index_end = null;
+				callback(null, booking);
+			})
 
 
+			
+
+		}))
 
 
-/*
-
-	if(!path && !options){
-		start_key = '_b.';
-		end_key = '_b.\xff';
-	}
-	else if(options){
-
-		if(!options.end){
-			options.end = new Date();
-		}
-
-		if(!options.start){
-			options.start = new Date('01/01/1980 00:00:00');
-		}
-
-		start_key = '_s.' + options.start.getTime() + '.' + (path || '') + '.';
-		end_key = '_s.' + options.end.getTime() + '.' + (path || '') + '.';
-
-		day_index_starttime = datefloor(options.start, 'day').getTime();
-		day_index_endtime = datefloor(options.end, 'day').getTime() + (1000*60*60*24);
-	}
-	else if(path){
-		start_key = '_b.' + path + '.';
-		end_key = '_b.' + path + '.\xff';
-	}
-*/
-
-	return this._db.createReadStream({
-		start:start_key,
-		end:end_key,
-		keyEncoding:'ascii',
-		valueEncoding:'ascii',
-		keys:true,
-		values:true
-	}).pipe(through(function(entry){
-
-		var key = entry.key.toString();
-		var value = entry.value.toString();
-
-		// it is a raw booking
-		if(key.indexOf('_b.')==0){
-			this.queue(JSON.parse(value));
-		}
-
-	}, function(){
-		callback && callback();
-		this.emit('end');
-	}))
 }

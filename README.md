@@ -1,7 +1,11 @@
 len
 ===
 
-Calendar database for of resource bookings in leveldb
+![len logo](https://github.com/binocarlos/len/raw/master/graphics/logosmall.png "Len Logo")
+
+![Build status](https://api.travis-ci.org/binocarlos/len.png)
+
+Calendar database for resource bookings using leveldb
 
 ## installation
 
@@ -39,8 +43,8 @@ var end = new Date('03/04/14 13:30:00');
 
 lendb.saveBooking('/mechanics/bob', {
 	id:14, 
-	start:start.getTime(),
-	end:end.getTime(),
+	start:start,
+	end:end,
 	meta:{
 		name:'Fix Car',
 		customer:34
@@ -62,8 +66,8 @@ var end = new Date('01/04/2014').getTime();
 var bookings_in_month = 0;
 
 lendb.createBookingStream('mechanics', {
-	start:start.getTime(),
-	end:end.getTime(),
+	start:start,
+	end:end,
 	// this means booking must start and end inside the window
 	inclusive:true
 }).pipe(through(function(booking){
@@ -98,7 +102,7 @@ This can be done using the paths you give to resources - if we create resources 
 Then we can ask for the start and end for one project:
 
 ```
-lendb.getBounds('team.alpha.project.1', function(err, bounds){
+lendb.getRange('team.alpha.project.1', function(err, bounds){
 	// bounds.start = timestamp of the earliest start of booking for the project
 	// bounds.end = timestamp of the latest end of booking for the project
 })
@@ -163,8 +167,8 @@ booking is an object:
 ``` js
 {
 	id: 0,                   // the id of the booking you are saving - this is auto-created is left blank
-	start: 1388739600000,    // the start timestamp of the booking
-	end: 1389618000000,      // the end timestamp of the booking
+	start: Date(),           // the start timestamp of the booking
+	end: Date(),             // the end timestamp of the booking
 	meta: {                  // an object with anything you like for the booking meta-data
 		customer:12,
 		comments:'apples'
@@ -178,8 +182,13 @@ The start and end timestamps are required - the meta object is converted to a JS
 var start = new Date('03/04/14 09:30:00');
 var end = new Date('03/04/14 13:30:00');
 
-lendb.createBooking('project.1', 14, start.getTime(), end.getTime(), {
-	name:'meta data here'
+lendb.createBooking('project.1', {
+	id:14,
+	start:start,
+	end:end,
+	meta:{
+		name:'meta data here'
+	}
 }, function(err){
 
 	// the booking is created for the resource
@@ -199,17 +208,6 @@ resource.removeBooking('project.1', 14, function(err){
 })
 ```
 
-#### `lendb.removeResource(resourcepath, callback)`
-
-Completely remove a resource and all of its descendents from the database
-
-```js
-lendb.remove('projects.1', function(err, project){
-	// project and all sub-resources are now removed
-})
-```
-
-
 #### `lendb.getRange(resourcepath, [window], callback)`
 
 Use this to get the start and end date for bookings in a resource
@@ -224,8 +222,8 @@ You can also pass a window to constrain the results:
 
 ```js
 lendb.getRange('projects.1', {
-	start:start.getTime(),
-	end:end.getTime()
+	start:start,
+	end:end
 }, function(err, range){
 
 	// range.start and range.end are timestamps
@@ -241,8 +239,8 @@ Use this to get an object stream of bookings for a given resource.
 var through = require('through');
 
 lendb.createBookingStream('mechanics.bob', {
-	start:start.getTime(),
-	end:end.getTime()
+	start:start,
+	end:end
 }).pipe(through(function(booking){
 
 	console.log('booking found');
@@ -261,8 +259,8 @@ var end = new Date('01/04/2014').getTime();
 var bookings_in_month = 0;
 
 lendb.createBookingStream('mechanics.bob', {
-	start:start.getTime(),
-	end:end.getTime(),
+	start:start,
+	end:end,
 	inclusive:true
 }).pipe(through(function(booking){
 
@@ -276,28 +274,6 @@ lendb.createBookingStream('mechanics.bob', {
 ```
 
 the inclusive option controls whether bookings have to start and end inside the time window (true) or if any part of it is in the time window (false)
-
-## events
-
-#### `lendb.on('booking', function(key, action, booking){})`
-
-called when a booking is changed - action is 'add', 'edit', or 'delete'
-
-```js
-lemdb.on('booking', function(key, action, booking){
-	
-})
-```
-
-#### `lendb.on('data', function(key, data){})`
-
-called when any data is changed in the database
-
-```js
-lemdb.on('data', function(key, data){
-	
-})
-```
 
 ## license
 

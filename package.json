@@ -1,6 +1,6 @@
 {
   "name": "len",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Calendar database for of resource bookings in leveldb",
   "main": "src/index.js",
   "scripts": {

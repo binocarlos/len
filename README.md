@@ -37,9 +37,9 @@ Here we create a booking for bob the mechanic:
 ```js
 
 // start at 9.30
-var start = new Date('03/04/14 09:30:00');
+var start = new Date('04/03/14 09:30:00');
 // end at 13.30
-var end = new Date('03/04/14 13:30:00');
+var end = new Date('04/03/14 13:30:00');
 
 lendb.saveBooking('/mechanics/bob', {
 	id:14, 
@@ -60,8 +60,8 @@ We can ask len about bookings for all mechanics in a particular month:
 
 ```js
 var through = require('through');
-var start = new Date('01/03/2014');
-var end = new Date('01/04/2014').getTime();
+var start = new Date('03/01/2014');
+var end = new Date('04/01/2014').getTime();
 
 var bookings_in_month = 0;
 
@@ -253,8 +253,8 @@ You can also query the booking stream using a time-window:
 
 ```js
 var through = require('through');
-var start = new Date('01/03/2014');
-var end = new Date('01/04/2014').getTime();
+var start = new Date('03/01/2014');
+var end = new Date('04/01/2014').getTime();
 
 var bookings_in_month = 0;
 

@@ -170,6 +170,34 @@ Len.prototype.createDayStreams = function(path, window){
 	}
 }
 
+Len.prototype.getRange = function(path, window, callback){
+
+	var start = null;
+	var end = null;
+
+	if(arguments.length<=2){
+		callback = window;
+		window = null;
+	}
+
+	return this.createBookingStream(path, window).pipe(through(function(booking){
+
+		if(!start || booking.start<start){
+			start = booking.start;
+		}
+
+		if(!end || booking.end>end){
+			end = booking.end;
+		}
+	}, function(){
+
+		callback(null, {
+			start:start,
+			end:end
+		})
+	}))
+}
+
 Len.prototype.createBookingStream = function(path, window){
 	var self = this;
 
@@ -201,7 +229,6 @@ Len.prototype.createBookingStream = function(path, window){
 	})
 
 	var bookings_seen = {};
-	var bookings_included = {};
 
 	return es
 		.merge(scheduleStream, dayStreams.start, dayStreams.end)
@@ -223,12 +250,18 @@ Len.prototype.createBookingStream = function(path, window){
 
 				booking = JSON.parse(booking.toString());
 
-				callback(null, booking);
+				var startinside = booking.start >= window.start.getTime();
+				var endinside = booking.end <= window.end.getTime();
+
+				var isahit = window.inclusive ? startinside && endinside : startinside || endinside;
+
+				if(isahit){
+					callback(null, booking);	
+				}
+				else{
+					callback();
+				}
 			})
-
-
-			
-
 		}))
 
 

@@ -28,8 +28,6 @@ var leveldb = level('/tmp/lentest');
 var lendb = len(db);
 ```
 
-You can add resources - these are things in the real world that can be 'booked'.
-
 A booking represents a resource being used for a period of time.
 
 Here we create a booking for bob the mechanic:
@@ -41,7 +39,7 @@ var start = new Date('04/03/14 09:30:00');
 // end at 13.30
 var end = new Date('04/03/14 13:30:00');
 
-lendb.saveBooking('/mechanics/bob', {
+lendb.saveBooking('mechanics.bob', {
 	id:14, 
 	start:start,
 	end:end,
